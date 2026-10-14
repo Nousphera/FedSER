@@ -13,3 +13,9 @@ jobs:
       - run: python -m pip check
       - run: python -m pytest -q
       - run: fedser train --config configs/smoke.json --output runs/ci-smoke
+      - name: Native Flower App smoke
+        env:
+          FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION: '1'
+        run: |
+          flwr run . --stream --run-config "output='$(pwd)/runs/flower-smoke'" \
+            --federation-config 'num-supernodes=2 client-resources-num-cpus=1 init-args-num-cpus=2'

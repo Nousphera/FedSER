@@ -59,7 +59,14 @@ class RunConfig:
 
 
 def load_config(path, **overrides):
-    value = json.loads(Path(path).read_text())
+    config_path = Path(path).resolve()
+    value = json.loads(config_path.read_text())
+    # Shipped configs live under configs/; keep their data paths tied to the
+    # checkout even when Flower executes a bundled app from a different cwd.
+    base = config_path.parent.parent if config_path.parent.name == "configs" else config_path.parent
+    for key in ("manifest", "pretrained_encoder", "output"):
+        if value.get(key) and not Path(value[key]).is_absolute():
+            value[key] = str((base / value[key]).resolve())
     value.update({k: v for k, v in overrides.items() if v is not None})
     return RunConfig(**value)
 
@@ -80,7 +87,12 @@ def make_data(config):
         test = [sample(99, n, True) for n in range(8)]
     else:
         manifest = json.loads(Path(config.manifest).read_text())
+        from .preparation import check_records
         root = Path(manifest["root"])
+        check_records(manifest["records"], list(range(4)), None, root)
+        if any(type(r.get("session")) is not int or r["session"] not in range(1, 6)
+               or not isinstance(r.get("speaker"), str) or not r["speaker"] for r in manifest["records"]):
+            raise ValueError("Invalid IEMOCAP session/speaker metadata")
         rows = [{**r, "path": str(root / r["path"])} for r in manifest["records"]]
         train, test = split_records(rows, config.protocol, config.fold, config.seed)
         clients = partition_clients(train, config.partition, config.clients, config.quantity_variation, config.seed)

@@ -1,86 +1,93 @@
 # FedSER
 
 **Privacy-preserving Speech Emotion Recognition through Semi-Supervised Federated Learning**
-Vasileios Tsouvalas, Tanir Ozcelebi and Nirvana Meratnia · EmotionAware / PerCom Workshops 2022
 
-[Paper](https://arxiv.org/abs/2202.02611) · [Project](https://nousphera.github.io/FedSER/) · [Poster](https://nousphera.github.io/FedSER/poster.pdf) · [Method mapping](docs/method.md) · [Reproducibility](docs/reproducibility.md)
+Vasileios Tsouvalas · Tanir Ozcelebi · Nirvana Meratnia · EmotionAware @ IEEE PerCom 2022
 
-FedSER trains an attention CNN on local labeled and unlabeled speech, selects
-confident pseudo-labels, and combines client models with FedAvg. This release
-contains the recovered author source, a maintained TensorFlow implementation,
-an IEMOCAP adapter, deterministic experiments and a runnable Flower App.
+[Paper](https://ieeexplore.ieee.org/document/9767445) · [Project](https://nousphera.github.io/FedSER/) · [Poster](https://nousphera.github.io/FedSER/poster.pdf)
 
-**Status:** installation, 17 tests, file-based audio training and two-round real
-Flower simulation verified. Full IEMOCAP benchmark reproduction remains
-unverified. The recovered source differs from the paper; the default `paper`
-mode follows the stated method with explicitly documented interpretations.
-`source` mode supports comparisons with the recovered behavior.
+## Abstract
 
-## Install and run
+Speech Emotion Recognition (SER) refers to the recognition of human emotions from natural speech. If done accurately, it can offer a number of benefits in building human-centered context-aware intelligent systems. Existing SER approaches are largely centralized, without considering users' privacy. Federated Learning (FL) is a distributed machine learning paradigm dealing with decentralization of privacy-sensitive personal data. In this paper, we present a privacy-preserving and data-efficient SER approach by utilizing the concept of FL. To the best of our knowledge, this is the first federated SER approach, which utilizes self-training learning in conjunction with federated learning to exploit both labeled and unlabeled on-device data. Our experimental evaluations on the IEMOCAP dataset shows that our federated approach can learn generalizable SER models even under low availability of data labels and highly non-i.i.d. distributions. We show that our approach with as few as 10% labeled data, on average, can improve the recognition rate by 8.67% compared to the fully-supervised federated counterparts.
 
-Python **3.11 or 3.12**. A CPU is enough for the smoke test; use an environment
-path without spaces for Ray/Flower. From this repository:
+## Setup
+
+Python 3.11 is tested on macOS arm64 CPU; Python 3.12 is supported but untested.
+A CPU is sufficient for the smoke run. Put the environment at a path without
+spaces so Flower/Ray can start workers.
 
 ```bash
-python3.11 -m venv ~/.venvs/fedser
-source ~/.venvs/fedser/bin/activate
-python -m pip install -e '.[flower,test]' -c requirements-lock-py311.txt
-python -m pip check
+git clone https://github.com/Nousphera/FedSER.git
+cd FedSER
+bash scripts/setup_env.sh "$HOME/.venvs/fedser"
+source "$HOME/.venvs/fedser/bin/activate"
 python -m pytest -q
-
-# Small deterministic FedAvg run; no data download
-fedser train --config configs/smoke.json
-
-# Actual Flower ClientApp + ServerApp, using the same trainer
-fedser flower --config configs/smoke.json --output runs/flower-smoke
 ```
 
-The smoke test uses generated waveforms and the full four-block STC model.
-It verifies training and aggregation, not emotion-recognition performance.
-An existing output directory is never overwritten. The native Flower App
-entry points are declared in `pyproject.toml`; `flwr build` packages the app.
+The setup script creates a new virtual environment and installs the package,
+Flower simulation and test dependencies using the tested dependency constraints.
+It refuses to change an existing environment. The equivalent manual install is
+`python3.11 -m venv "$HOME/.venvs/fedser"`, activate it, then
+`python -m pip install -e '.[flower,test]' -c requirements-lock-py311.txt`.
 
-## Train on IEMOCAP
+## Dataset
 
-Obtain IEMOCAP under its [dataset access terms](https://sail.usc.edu/iemocap/).
-Keep the original `Session*/dialog/EmoEvaluation` annotations and
-`Session*/sentences/wav` utterances. No recordings are included or downloaded.
+Request [IEMOCAP](https://sail.usc.edu/iemocap/) from its provider and extract the
+licensed release yourself. Preserve `Session*/dialog/EmoEvaluation/*.txt` and
+`Session*/sentences/wav/<dialogue>/*.wav`. No access credentials or audio are supplied.
 
 ```bash
-fedser prepare --root /path/to/IEMOCAP_full_release --output data/iemocap.json
-fedser train --config configs/iemocap.json
-# Or use the Flower runtime:
-fedser flower --config configs/iemocap.json --output runs/iemocap-flower
+python scripts/prepare_data.py prepare --root /path/to/IEMOCAP_full_release \
+  --output data/iemocap.json
+python scripts/prepare_data.py validate --manifest data/iemocap.json
 ```
 
-Preparation keeps improvised neutral/happy/sad/angry utterances. Excited speech
-is excluded by default; `prepare --merge-excited` explicitly merges it into
-happy and records that choice. The paper and recovered data helpers do not
-unambiguously establish the original mapping.
+Preparation indexes improvised neutral/happy/sad/angry utterances, decodes every
+16 kHz PCM WAV, and atomically writes IDs, speaker/session labels and SHA-256
+checksums. Existing manifests are preserved. To merge excited into happy, add
+`--merge-excited`; this choice is recorded. The original class mapping remains
+ambiguous; see [data and split details](docs/reproducibility.md).
 
-Edit the JSON configuration to choose session-held-out or overlapping-speaker
-folds, random or per-speaker clients, label fraction, supervised-only baseline,
-rounds and local training. Session-held-out per-speaker training has eight
-clients. See [reproducibility](docs/reproducibility.md) for all folds/seeds,
-label-budget comparisons and the unresolved eight-client overlapping protocol.
+## Run
 
-Each run saves its resolved configuration, ownership/label partitions,
-environment, per-round client metrics, utterance-level UA and accuracy, and a
-loadable `model.keras`. The data split is made at utterance level before
-cropping. The test set is used only for evaluation.
+Start a native Flower App from the repository. The smoke configuration trains the
+full attention CNN with two clients for two rounds on generated waveforms:
 
-## Research boundaries and provenance
+```bash
+export FLWR_HOME="$HOME/.cache/fedser-flower"
+export FLWR_LOCAL_SUPERLINK_HTTP_API_PORT=39131
+export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1
+flwr run . --stream \
+  --run-config "config='$(pwd)/configs/smoke.json' output='$(pwd)/runs/flower-smoke'" \
+  --federation-config 'num-supernodes=2 client-resources-num-cpus=1 init-args-num-cpus=2'
+```
 
-The [method mapping](docs/method.md) documents the threshold-equation mismatch,
-attention, loss weighting, temperature, segmentation and metric corrections.
-[Exact source files and hashes](provenance/README.md) identify the recovered
-commit without publishing private history, data, checkpoints or result archives.
-No paper checkpoint or original benchmark split manifest was recovered.
+After preparing IEMOCAP, run the ten-client example configuration:
 
-The supplied runtimes are single-machine research simulations with local file
-access. Production data isolation, transport authentication and deployment
-hardening are outside this release. Keeping recordings out of model messages
-provides no formal differential-privacy or secure-aggregation guarantee.
+```bash
+flwr run . --stream \
+  --run-config "config='$(pwd)/configs/iemocap.json' output='$(pwd)/runs/iemocap-flower'" \
+  --federation-config 'num-supernodes=10 client-resources-num-cpus=1 init-args-num-cpus=2'
+```
+
+The federation node count must equal `clients` in the JSON config. The server
+saves evaluation results and the final model; each client performs actual local
+self-training. For sequential debugging, use
+`fedser train --config configs/smoke.json --output runs/sequential-smoke`.
+Flower keeps its local SuperLink running; see [runtime lifecycle and path rules](docs/reproducibility.md#native-flower-cli).
+
+## Outputs and reproducibility
+
+Each new output directory contains `config.json`, `partitions.json`,
+`environment.json`, `metrics.json`, and `model.keras`. Partitions save utterance
+ownership and label masks; metrics include utterance accuracy, unweighted accuracy
+and client participation. Choose a new output directory for each run.
+
+The [method mapping](docs/method.md), [reproducibility guide](docs/reproducibility.md)
+and [source provenance](provenance/README.md) distinguish the paper interpretation
+from recovered behavior. Full IEMOCAP benchmarks, GPU execution and original
+checkpoint equivalence remain unverified. This local research simulation adds no
+formal privacy guarantee.
 
 ## Citation
 
@@ -99,8 +106,6 @@ provides no formal differential-privacy or secure-aggregation guarantee.
 
 ## Licensing
 
-The author authorized publication of the recovered code. The original
-repository had no code license; this release does not invent reuse terms.
-Contact the author for permission until an explicit license is provided.
-IEMOCAP, publications and dependencies retain their respective licenses.
-See [provenance](provenance/README.md) for exclusions and attribution.
+The recovered source has no code license; reuse terms remain unspecified.
+Contact the authors for permission. Dataset, publication and dependency terms
+remain with their providers; see [source provenance](provenance/README.md).

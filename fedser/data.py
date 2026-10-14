@@ -93,7 +93,10 @@ def read_wave(path):
     waveform, rate = tf.audio.decode_wav(tf.io.read_file(str(path)), desired_channels=1)
     if int(rate) != 16000:
         raise ValueError(f"Expected 16000 Hz PCM WAV: {path}; got {int(rate)}")
-    return waveform[:, 0].numpy()
+    wave = waveform[:, 0].numpy()
+    if not len(wave) or not np.isfinite(wave).all():
+        raise ValueError(f"Invalid audio: {path}")
+    return wave
 
 
 def features(waveform, training, rng, mode="paper"):

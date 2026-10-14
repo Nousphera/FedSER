@@ -128,3 +128,36 @@ provided shared-filesystem simulation is not a production privacy boundary.
 
 API references: [Flower TensorFlow App](https://flower.ai/docs/framework/tutorial-quickstart-tensorflow.html),
 [Keras GroupNormalization](https://www.tensorflow.org/api_docs/python/tf/keras/layers/GroupNormalization).
+
+
+## Native Flower CLI
+
+The README's `flwr run . --stream` runs the packaged ClientApp and ServerApp
+through Flower 1.40's managed local SuperLink. Both native CLI paths were verified
+with two clients and two rounds; client metrics, server metrics and model files
+were saved. Generated-data execution is not a dataset benchmark.
+
+`FLWR_HOME` and the local HTTP port in the README isolate this app's runtime from
+other projects. Flower keeps the managed SuperLink running after a run. Use
+`flwr list`, `flwr log RUN_ID --show`, or `flwr stop RUN_ID` in the same environment.
+A stop request stops that run, not the background service. The official
+[local runtime guide](https://flower.ai/docs/framework/main/en/how-to-run-flower-locally.html)
+explains service lifecycle and logs. If changing virtual environments, inspect
+and stop only the matching service process before starting its replacement.
+`FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1` uses the dependencies already
+installed by setup; this avoids a second uncontrolled installation at run time.
+
+The Python environment and its actual package files must live in paths without
+spaces; symlinking a space-containing environment is insufficient. The repository
+and data paths may contain spaces. Supply absolute `config` and `output` paths in
+`--run-config`, as shown in the README. Paths inside files in `configs/` resolve
+against that directory's parent (the checkout), even when Flower executes its
+bundle elsewhere. For a config outside `configs/`, paths resolve against the
+config file's own directory. CLI `--output` overrides resolve in the caller's
+working directory. Set `num-supernodes` equal to the configured client count.
+
+Preparation now decodes every input and records SHA-256/byte counts before
+atomically publishing its manifest. `fedser validate --manifest PATH` checks those
+hashes again. Training performs structural, label and duplicate-path checks;
+run explicit validation after moving or changing data. Preparation and training
+refuse to overwrite outputs. Manifests are local artifacts and can reveal paths.
