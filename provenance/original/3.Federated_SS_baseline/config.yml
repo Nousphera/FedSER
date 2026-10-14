@@ -1,0 +1,45 @@
+server:
+  GPU_ID: 1
+  GPU_MEMORY_SIZE: 430
+  LOG_TO_FILE: true
+  PLOT_PROGRESS: true
+  SAVE_MODEL: true
+  MIN_NUM_CLIENTS: 8
+  SAMPLE_CLIENTS: 8
+  SAMPLE_FRACTION: 1.0
+  TRAINING_ROUNDS: 100
+  EVALUATION_STEP: 5
+
+clients:
+  GPU_USE: ALL
+  GPU_MEMORY_ADD: 451
+  GPU_MEMORY_SIZE: 2350
+  INFO_LEVEL: ERROR
+  NUM_CLIENTS: 8
+  VERBOSE: 0
+
+dataset:
+  DATASET_NAME: iemocap
+  DATA_DIR: tensorflow_datasets
+  SPLIT: Speaker
+  MEAN: 0.5
+  VARIANCE: 0.25
+  LABELLED_PER: 0.16
+  UNLABELLED_PER: 1.0
+  SPLIT_FILE: Random_3
+
+global:
+  SRC_DIR: src
+  FIGURE_SAVE_DIR: logs/figures/
+  FLOWER_LOGS_DIR: logs/flower_logger/
+  MODEL_SAVE_DIR: logs/models/
+  CONFIG_DIR: logs/configs/
+  SERVER_ADDRESS: '[::]:10001'
+  SEED: 2001
+
+model:
+  BATCH_SIZE: 64
+  DROPOUT_RATE: 0.1
+  LR: 0.001
+  NUM_MELS: 64
+  TRAIN_EPOCHS: 1

@@ -1,0 +1,13 @@
+{
+  "dataset": "synthetic",
+  "mode": "paper",
+  "rounds": 2,
+  "clients": 2,
+  "participation": 1.0,
+  "local_epochs": 1,
+  "batch_size": 4,
+  "labeled_fraction": 0.5,
+  "synthetic_per_client": 8,
+  "seed": 2021,
+  "output": "runs/smoke"
+}

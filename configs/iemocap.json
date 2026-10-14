@@ -1,0 +1,21 @@
+{
+  "dataset": "iemocap",
+  "manifest": "data/iemocap.json",
+  "mode": "paper",
+  "protocol": "session",
+  "fold": 1,
+  "partition": "random",
+  "clients": 10,
+  "quantity_variation": 0.25,
+  "labeled_fraction": 0.1,
+  "rounds": 100,
+  "participation": 0.8,
+  "local_epochs": 1,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "beta": 0.5,
+  "temperature": 2.0,
+  "delta": 0.5,
+  "seed": 2021,
+  "output": "runs/iemocap-session1-seed2021"
+}
