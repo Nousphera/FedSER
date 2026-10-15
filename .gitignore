@@ -6,11 +6,10 @@ __pycache__/
 build/
 dist/
 data/
+results/
 runs/
 *.wav
-*.npz
-*.h5
-*.keras
+*.pt
 *.log
 *.fab
 .DS_Store

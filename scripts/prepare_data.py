@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Run the installed fedser data CLI; see --help and each subcommand --help."""
-from fedser.cli import main
+"""Prepare all five sessions of the locally supplied, licensed IEMOCAP corpus."""
+from fedser.preparation import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

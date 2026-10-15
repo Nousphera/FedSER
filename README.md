@@ -1,143 +1,99 @@
-# FedSER
-
-**Privacy-preserving Speech Emotion Recognition through Semi-Supervised Federated Learning**
-
-Vasileios Tsouvalas · Tanir Ozcelebi · Nirvana Meratnia · EmotionAware @ IEEE PerCom 2022
-
-[<img src="docs/assets/icons/paper.svg" width="16" height="16" alt=""> Paper](https://ieeexplore.ieee.org/document/9767445) · [<img src="docs/assets/icons/project.svg" width="16" height="16" alt=""> Project](https://nousphera.github.io/FedSER/) · [Poster](https://nousphera.github.io/FedSER/poster.pdf)
+<h1 align="center">FedSER</h1>
+<p align="center"><strong>Privacy-preserving Speech Emotion Recognition through Semi-Supervised Federated Learning</strong></p>
+<p align="center"><a href="https://vtsouval.github.io/"><strong>Vasileios Tsouvalas</strong></a> · Tanir Özçelebi · Nirvana Meratnia</p>
 
 <p align="center">
-  <a href="https://nousphera.github.io/FedSER/#overview"><img src="docs/assets/readme/overview.webp" width="1000" alt="An attention-based convolutional model analyzes audio spectrograms while federated clients train using labeled inputs and confidence-filtered pseudo-labels from unlabeled inputs."></a>
+  <a href="https://doi.org/10.1109/PerComWorkshops53856.2022.9767445" title="Read the paper"><img src="docs/assets/icons/resource-paper.svg" width="48" height="48" alt="Paper"></a>
+  <picture><img src="docs/assets/icons/resource-separator.svg" width="20" height="48" alt=""></picture>
+  <a href="https://nousphera.github.io/FedSER/" title="Explore the project"><img src="docs/assets/icons/resource-project.svg" width="48" height="48" alt="Project"></a>
+  <picture><img src="docs/assets/icons/resource-separator.svg" width="20" height="48" alt=""></picture>
+  <a href="https://nousphera.github.io/assets/posters/fedser-a0-landscape.pdf" title="View the poster"><img src="docs/assets/icons/resource-poster.svg" width="48" height="48" alt="Poster"></a>
 </p>
-<p align="center"><sub>Figure 1 · public preprint, p. 3. <a href="https://arxiv.org/pdf/2202.02611#page=3">Original figure</a> · <a href="https://nousphera.github.io/FedSER/#overview">Animated method overview</a></sub></p>
 
 ## Abstract
 
-Speech Emotion Recognition (SER) refers to the recognition of human emotions from natural speech. If done accurately, it can offer a number of benefits in building human-centered context-aware intelligent systems. Existing SER approaches are largely centralized, without considering users' privacy. Federated Learning (FL) is a distributed machine learning paradigm dealing with decentralization of privacy-sensitive personal data. In this paper, we present a privacy-preserving and data-efficient SER approach by utilizing the concept of FL. To the best of our knowledge, this is the first federated SER approach, which utilizes self-training learning in conjunction with federated learning to exploit both labeled and unlabeled on-device data. Our experimental evaluations on the IEMOCAP dataset shows that our federated approach can learn generalizable SER models even under low availability of data labels and highly non-i.i.d. distributions. We show that our approach with as few as 10% labeled data, on average, can improve the recognition rate by 8.67% compared to the fully-supervised federated counterparts.
+**FedSER** learns *speech emotion recognition* from **few labeled utterances** and *on-device unlabeled speech*. A compact CNN uses **spectral, temporal and channel attention** to capture emotional cues. Each client learns from its labels and **confidence-filtered pseudo-labels**, with a *device-specific threshold* driven by global progress and local participation. The server combines model updates through **sample-weighted aggregation**, while raw recordings remain on each device. Experiments on **IEMOCAP** examine *speaker-independent and overlapping-speaker evaluation* under random and per-speaker client distributions.
 
-## Requirements and installation
+<p align="center">
+  <a href="docs/assets/readme/method-light.mp4" title="Watch the method video">
+    <picture>
+      <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="docs/assets/readme/method-dark-mobile.gif">
+      <source media="(max-width: 600px)" srcset="docs/assets/readme/method-light-mobile.gif">
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/method-dark.gif">
+      <img src="docs/assets/readme/method-light.gif" alt="FedSER: attend to speech features, select confident emotion targets, learn locally and aggregate client models." width="960">
+    </picture>
+  </a>
+</p>
 
-Use Python 3.11 or 3.12 in a dedicated virtual environment.
-A CPU is sufficient for the smoke run. Put the environment at a path without
-spaces so Flower/Ray can start workers.
+## Setup
+
+Create and activate the `fedser` environment:
 
 ```bash
 git clone https://github.com/Nousphera/FedSER.git
 cd FedSER
-bash scripts/setup_env.sh "$HOME/.venvs/fedser"
+python3.12 -m venv --prompt fedser "$HOME/.venvs/fedser"
 source "$HOME/.venvs/fedser/bin/activate"
-python -m pytest -q
 ```
 
-The setup script creates a new virtual environment and installs the package,
-Flower simulation and test dependencies from `requirements.txt`.
-It refuses to change an existing environment. The equivalent manual install is
-`python3.11 -m venv "$HOME/.venvs/fedser"`, activate it, then
-`python -m pip install -r requirements.txt`.
-
-## Data preparation
-
-Request [IEMOCAP](https://sail.usc.edu/iemocap/) from its provider and extract the
-licensed release yourself. Preserve `Session*/dialog/EmoEvaluation/*.txt` and
-`Session*/sentences/wav/<dialogue>/*.wav`. No access credentials or audio are supplied.
+From the activated `fedser` environment, install the requirements:
 
 ```bash
-python scripts/prepare_data.py prepare --root /path/to/IEMOCAP_full_release \
-  --output data/iemocap.json
-python scripts/prepare_data.py validate --manifest data/iemocap.json
+python -m pip install -r requirements.txt
 ```
 
-Preparation indexes improvised neutral/happy/sad/angry utterances, decodes every
-16 kHz PCM WAV, and atomically writes IDs, speaker/session labels and SHA-256
-checksums. Existing manifests are preserved. To merge excited into happy, add
-`--merge-excited`; this choice is recorded. See [data and split details](docs/method.md) for label policies and
-speaker-based evaluation.
+## Data and Weights
 
-## Training
-
-Start a native Flower App from the repository. The smoke configuration trains the
-full attention CNN with two clients for two rounds on generated waveforms:
+Obtain [IEMOCAP](https://sail.usc.edu/iemocap/) from USC and extract it under `data/raw/iemocap/`, retaining `Session*/dialog/EmoEvaluation/` and `Session*/sentences/wav/`. Prepare and validate the corpus:
 
 ```bash
-export FLWR_HOME="$HOME/.cache/fedser-flower"
-export FLWR_LOCAL_SUPERLINK_HTTP_API_PORT=39131
-export FLWR_LOCAL_CONTROL_API_PORT=39231
-export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1
-flwr run . --stream \
-  --run-config "config='$(pwd)/configs/smoke.json' output='$(pwd)/runs/flower-smoke'" \
-  --federation-config 'num-supernodes=2 client-resources-num-cpus=1 init-args-num-cpus=2'
+python scripts/prepare_data.py
+
+# An existing corpus elsewhere
+python scripts/prepare_data.py --source-dir /path/to/IEMOCAP_full_release
 ```
 
-After preparing IEMOCAP, run the ten-client example configuration:
+> [!NOTE]
+> Uses **improvised speech** labeled **neutral, happy, sad or angry**. Add `--merge-excited` to include *excited* utterances in the happy class.
+
+### Prepare Model
+
+The **four-block CNN with spectro-temporal-channel attention** trains from scratch; no pretrained weights are required.
+
+## Run Experiments
+
+From the repository root, launch your chosen method as a **Flower App**:
 
 ```bash
-flwr run . --stream \
-  --run-config "config='$(pwd)/configs/iemocap.json' output='$(pwd)/runs/iemocap-flower'" \
-  --federation-config 'num-supernodes=10 client-resources-num-cpus=1 init-args-num-cpus=2'
+# Shared experiment settings
+common=(--protocol session --fold 1 --partition random --nr-clients 10
+        --rounds 100 --participation 0.8 --quantity-variation 0.25
+        --labeled-fraction 0.1 --local-epochs 1 --batch-size 64
+        --learning-rate 0.001)
+
+# FedSER (ours) · self-training
+python scripts/run_experiment.py "${common[@]}" --method fedser
+
+# FedAvg · the same labeled utterances
+python scripts/run_experiment.py "${common[@]}" --method fedavg
+
+# Fully supervised FL · all labels
+python scripts/run_experiment.py "${common[@]}" --method fedavg --labeled-fraction 1
+
+# Centralized · all labels
+python scripts/run_experiment.py "${common[@]}" --method centralized --labeled-fraction 1
+
+# Per-speaker clients · automatically match the training speakers
+python scripts/run_experiment.py "${common[@]}" --partition speaker --nr-clients 0
+
+# Overlapping speakers · stratified five-fold evaluation
+python scripts/run_experiment.py "${common[@]}" --protocol overlap
 ```
 
-The federation node count must equal `clients` in the JSON config. The server
-saves evaluation results and the final model; each client performs actual local
-self-training. For sequential debugging, use
-`fedser train --config configs/smoke.json --output runs/sequential-smoke`.
-Flower keeps its local SuperLink running; see [runtime lifecycle and path rules](docs/method.md#native-flower-cli).
+> [!NOTE]
+> FedSER pairs equal labeled/unlabeled batches with **T = 2**, **β = 0.5** and a participation-adjusted confidence threshold starting at **0.5**. Evaluation averages segment probabilities and reports **unweighted accuracy**. Metrics and weights are saved under `results/`.
 
-## Evaluation
-
-Training evaluates the global model on held-out utterances after every round and
-writes `metrics.json`. Segment probabilities are averaged to predict each
-utterance. `ua` is mean per-class recall and `accuracy` is ordinary utterance
-accuracy; both are stored as fractions. Inspect the final round from the IEMOCAP
-run above:
-
-```bash
-python - runs/iemocap-flower/metrics.json <<'PY_METRICS'
-import json
-import sys
-from pathlib import Path
-
-last = json.loads(Path(sys.argv[1]).read_text())["rounds"][-1]
-print(f"Round {last['round']}: UA {100 * last['ua']:.2f}%, accuracy {100 * last['accuracy']:.2f}%")
-PY_METRICS
-```
-
-`configs/iemocap.json` uses session 1 as the held-out fold, 10 randomly partitioned
-clients, 10% labels, 100 rounds, 80% participation and one local epoch. Set
-`protocol`, `fold` and `partition` for the desired speaker protocol. Use the
-[fold-and-seed recipe](docs/method.md#configuration-and-repeated-runs)
-to evaluate all five session folds. For the same-label supervised comparison,
-set `supervised_only` to `true`; `labeled_fraction: 1.0` gives the fully labeled
-reference.
-
-## Results
-
-**Published IEMOCAP experiment — Table III.** Four emotions from improvised
-speech, with 10% labeled data for both methods. Values are mean unweighted
-accuracy (UA, %) over five runs per split; higher is better. Random partitions
-use 10 clients and per-speaker partitions use 8. [Paper, Table III](https://arxiv.org/pdf/2202.02611v1#page=5).
-
-| Evaluation split and client partition | Supervised FL · 10% labels | FedSER · 10% labels | Supervised FL · 100% labels |
-|---|---:|---:|---:|
-| Unseen speakers · random | 46.72 | **53.94** | 60.52 |
-| Unseen speakers · per speaker | 46.55 | **56.83** | 59.55 |
-| Overlapping speakers · random | 51.58 | **59.04** | 64.78 |
-| Overlapping speakers · per speaker | 49.97 | **59.72** | 62.79 |
-
-Self-training improves every equal-label comparison. Unseen-speaker evaluation
-holds out a session; overlapping-speaker evaluation uses five 80:20 folds.
-[Explore the published results](https://nousphera.github.io/FedSER/#findings).
-
-## Configuration and outputs
-
-Each new output directory contains `config.json`, `partitions.json`,
-`environment.json`, `metrics.json`, and `model.keras`. Partitions save utterance
-ownership and label masks; metrics include utterance accuracy, unweighted accuracy
-and client participation. Choose a new output directory for each run.
-
-Configure the objective and attention with `mode`, the evaluation split with
-`protocol` and `fold`, and client allocation with `partition` and `clients`.
-See the [method and configuration guide](docs/method.md) for model modes, label
-budgets, repeated runs and Flower runtime management.
+Use `--fold 1` through `5` and repeat each fold with five `--seed` values; `--data-seed` keeps folds and label selections fixed. Speaker partitions retain all training speakers: **8** for session holdout and **10** for overlapping-speaker evaluation.
 
 ## Citation
 
@@ -148,13 +104,7 @@ budgets, repeated runs and Flower runtime management.
   booktitle = {2022 IEEE International Conference on Pervasive Computing and Communications Workshops and other Affiliated Events (PerCom Workshops)},
   year = {2022},
   pages = {359--364},
-  note = {EmotionAware workshop},
   doi = {10.1109/PerComWorkshops53856.2022.9767445},
   url = {https://doi.org/10.1109/PerComWorkshops53856.2022.9767445}
 }
 ```
-
-## Licensing
-
-A software license has not been specified. Contact the authors for reuse terms.
-Dataset, publication and dependency terms remain with their providers.

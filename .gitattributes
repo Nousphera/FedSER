@@ -1,2 +1,0 @@
-# Preserve the exact upstream snapshot, including its historical whitespace.
-provenance/original/** -whitespace

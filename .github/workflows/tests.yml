@@ -1,29 +1,107 @@
-name: tests
-on: [push, pull_request]
+name: PyTorch and Flower
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
-  cpu:
+  train:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: '3.11'
-          cache: pip
-      - run: python -m pip install -r requirements.txt
-      - run: python -m pip check
-      - run: python -m pytest -q
-      - run: fedser train --config configs/smoke.json --output runs/ci-smoke
-      - name: Native Flower App smoke
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install Source
+        run: |
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt
+          python -m pip check
+          python -m compileall -q src/fedser scripts
+      - name: Check Objective and Attention
+        run: |
+          python - <<'PY'
+          import math
+          import torch
+          from fedser.methods import confidence_threshold, self_training_loss
+          from fedser.models import build_model, l2_penalty
+          torch.set_num_threads(1)
+          model = build_model()
+          x = torch.randn(2, 1, 198, 64)
+          logits = model(x)
+          loss, info = self_training_loss(logits, torch.tensor([0, -1]), threshold=0)
+          (loss + l2_penalty(model)).backward()
+          assert logits.shape == (2, 4) and info['accepted'] == 1
+          assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in model.parameters())
+          attention = model.attention(torch.randn(2, 128, 12, 4))
+          torch.testing.assert_close(attention.sum(2), torch.ones(2, 128, 4))
+          assert confidence_threshold(0, 0, 100) == .5
+          assert confidence_threshold(50, 10, 100) < confidence_threshold(50, 50, 100)
+          PY
+      - name: Prepare Parser Fixture
+        # Generated signals exercise parsing/training without distributing licensed IEMOCAP.
+        # Fixture metrics are integration checks, never benchmark measurements.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import numpy as np
+          import soundfile as sf
+          root = Path('data/raw/iemocap')
+          emotions = ['neu', 'hap', 'sad', 'ang']
+          index = 0
+          for session in range(1, 6):
+              lines = []
+              for speaker in 'FM':
+                  for label, emotion in enumerate(emotions):
+                      for item in range(6):
+                          uid = f'Ses0{session}F_impro01_{speaker}{label * 6 + item:03d}'
+                          path = root / f'Session{session}/sentences/wav/{uid.rsplit("_", 1)[0]}/{uid}.wav'
+                          path.parent.mkdir(parents=True, exist_ok=True)
+                          time = np.arange(32000) / 16000
+                          wave = .1 * np.sin(2 * np.pi * (150 + index) * time + index / 100)
+                          sf.write(path, wave, 16000)
+                          lines.append(f'[0.0 - 2.0] {uid} {emotion} [2.5, 2.5, 2.5]')
+                          index += 1
+              annotation = root / f'Session{session}/dialog/EmoEvaluation/Ses0{session}F_impro01.txt'
+              annotation.parent.mkdir(parents=True, exist_ok=True)
+              annotation.write_text('\n'.join(lines) + '\n')
+          PY
+          python scripts/prepare_data.py
+          python scripts/prepare_data.py --validate
+      - name: Run Native Flower Methods
         env:
           FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION: '1'
         run: |
-          flwr run . --stream --run-config "output='$(pwd)/runs/flower-smoke'" \
-            --federation-config 'num-supernodes=2 client-resources-num-cpus=1 init-args-num-cpus=2'
-          python - <<'PYVERIFY'
-          import json
+          common=(--nr-clients 2 --rounds 2 --participation 1 --batch-size 16
+                  --labeled-fraction .5 --device cpu)
+          python scripts/run_experiment.py "${common[@]}" --method fedser
+          python scripts/run_experiment.py "${common[@]}" --method fedavg
+          python scripts/run_experiment.py "${common[@]}" --method fedavg --labeled-fraction 1
+          python scripts/run_experiment.py "${common[@]}" --method centralized --labeled-fraction 1
+          python scripts/run_experiment.py "${common[@]}" --protocol overlap --partition speaker --nr-clients 0 --participation .5 --rounds 3
+          python - <<'PY'
           from pathlib import Path
-          result = json.loads(Path("runs/flower-smoke/metrics.json").read_text())
-          rounds = [row for row in result["rounds"] if row["round"] > 0]
-          assert len(rounds) == 2 and all(len(row["client_metrics"]) == 2 for row in rounds)
-          assert Path("runs/flower-smoke/model.keras").is_file()
-          PYVERIFY
+          import json, math
+          results = [json.loads(p.read_text()) for p in Path('results').glob('*.json')]
+          assert len(results) == 5
+          for result in results:
+              assert len(result['rounds']) == result['config']['num-rounds']
+              for rnd in result['rounds']:
+                  assert math.isfinite(rnd['loss']) and 0 <= rnd['unweighted-accuracy'] <= 1
+                  assert len(rnd['confusion-matrix']) == 4
+              train_ids = {uid for part in result['partitions'] for key in ('labeled','unlabeled') for uid in part[key]}
+              assert not train_ids.intersection(result['test-ids'])
+          ss = next(r for r in results if r['config']['method']=='fedser' and r['config']['protocol']=='session')
+          supervised = next(r for r in results if r['config']['method']=='fedavg' and r['config']['labeled-fraction']==.5)
+          assert [p['labeled'] for p in ss['partitions']] == [p['labeled'] for p in supervised['partitions']]
+          assert all(not p['unlabeled'] for p in supervised['partitions'])
+          PY
+      - name: Check Patch
+        run: git diff-tree --check HEAD
