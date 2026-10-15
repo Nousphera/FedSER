@@ -50,7 +50,7 @@ python scripts/prepare_data.py validate --manifest data/iemocap.json
 Preparation indexes improvised neutral/happy/sad/angry utterances, decodes every
 16 kHz PCM WAV, and atomically writes IDs, speaker/session labels and SHA-256
 checksums. Existing manifests are preserved. To merge excited into happy, add
-`--merge-excited`; this choice is recorded. See [data and split details](docs/reproducibility.md) for label policies and
+`--merge-excited`; this choice is recorded. See [data and split details](docs/method.md) for label policies and
 speaker-based evaluation.
 
 ## Training
@@ -80,7 +80,7 @@ The federation node count must equal `clients` in the JSON config. The server
 saves evaluation results and the final model; each client performs actual local
 self-training. For sequential debugging, use
 `fedser train --config configs/smoke.json --output runs/sequential-smoke`.
-Flower keeps its local SuperLink running; see [runtime lifecycle and path rules](docs/reproducibility.md#native-flower-cli).
+Flower keeps its local SuperLink running; see [runtime lifecycle and path rules](docs/method.md#native-flower-cli).
 
 ## Evaluation
 
@@ -104,7 +104,7 @@ PY_METRICS
 `configs/iemocap.json` uses session 1 as the held-out fold, 10 randomly partitioned
 clients, 10% labels, 100 rounds, 80% participation and one local epoch. Set
 `protocol`, `fold` and `partition` for the desired speaker protocol. Use the
-[fold-and-seed recipe](docs/reproducibility.md#configuration-and-repeated-runs)
+[fold-and-seed recipe](docs/method.md#configuration-and-repeated-runs)
 to evaluate all five session folds. For the same-label supervised comparison,
 set `supervised_only` to `true`; `labeled_fraction: 1.0` gives the fully labeled
 reference.
@@ -136,9 +136,8 @@ and client participation. Choose a new output directory for each run.
 
 Configure the objective and attention with `mode`, the evaluation split with
 `protocol` and `fold`, and client allocation with `partition` and `clients`.
-The [method guide](docs/method.md) describes both modes; the
-[experiment guide](docs/reproducibility.md) covers label budgets, repeated runs
-and Flower runtime management.
+See the [method and configuration guide](docs/method.md) for model modes, label
+budgets, repeated runs and Flower runtime management.
 
 ## Citation
 
@@ -159,4 +158,3 @@ and Flower runtime management.
 
 A software license has not been specified. Contact the authors for reuse terms.
 Dataset, publication and dependency terms remain with their providers.
-See [source credits](provenance/README.md).

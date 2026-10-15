@@ -59,8 +59,7 @@ is the explicit implementation contract.
 
 IEMOCAP preparation selects improvised neutral, happy, sad and angry utterances.
 `--merge-excited` explicitly includes excited speech in the happy class. Keep
-this choice fixed when comparing runs; source constants also include an
-excited-based class selection.
+this choice fixed when comparing runs.
 
 Session evaluation holds out one complete session before preprocessing. The
 alternative `overlap` protocol uses five stratified utterance folds. Random
@@ -84,6 +83,85 @@ Its seeded selection uses runtime node IDs, so partial-participation trajectorie
 can differ across launches or from sequential execution.
 
 Training exchanges model updates; differential privacy and secure aggregation
-are separate deployment requirements. See the [experiment guide](reproducibility.md)
-for output records and runtime management, and [source credits](../provenance/README.md)
-for attribution.
+are separate deployment requirements. Execution settings and output records are defined below.
+
+## Data and splits
+
+`fedser prepare` reads licensed IEMOCAP annotations and writes a manifest with
+`schema`, `root`, `merge_excited` and `records`. Each record includes an utterance
+ID, relative WAV path, session, speaker, integer label, SHA-256 and byte count.
+The speaker comes from the utterance's F/M suffix. Audio must be 16 kHz PCM;
+stereo inputs use their first channel. Preparation decodes every file and
+rejects duplicate IDs/paths. `fedser validate --manifest PATH` repeats decoding
+and hash checks. Run it after copying or changing a corpus.
+
+Labels are 0 neutral, 1 happy, 2 sad and 3 angry. Excited-to-happy merging requires
+`--merge-excited`. Preserve this policy and the manifest hash with each run.
+Manifests and run records can contain local paths; share them according to your
+dataset agreement.
+
+`protocol="session"` uses `fold=1..5`; `protocol="overlap"` uses five stratified
+utterance folds. The client and label-budget rules are defined above.
+`supervised_only=true` uses the same label masks and removes unlabeled examples;
+`labeled_fraction=1.0` selects the fully labeled comparison.
+
+## Configuration and repeated runs
+
+The IEMOCAP config uses 100 rounds, 80% participation, one local epoch, batch
+size 64 **per labeled or unlabeled branch**, Adam 0.001, beta 0.5, temperature 2,
+and confidence 0.5–0.9 with delta 0.5. Mode and epoch semantics are defined above.
+
+Use a distinct output directory for every fold/seed. For example, sequential
+experiments can be scheduled with:
+
+```bash
+for fold in 1 2 3 4 5; do
+  for seed in 2021 2022 2023 2024 2025; do
+    fedser train --config configs/iemocap.json --fold "$fold" --seed "$seed" \
+      --output "runs/iemocap-fold${fold}-seed${seed}"
+  done
+done
+```
+
+These example seeds control folds, allocations, label masks, model initialization,
+client sampling and crops. Report unweighted accuracy across runs within each
+split, then the split average and variation. Keep ordinary accuracy separately
+named. The sequential CPU engine enables deterministic TensorFlow operations;
+hardware/library changes and Flower runtime node-ID assignment can change
+trajectories. Preserve participation records for comparisons.
+
+## Outputs
+
+| File | Contents |
+|---|---|
+| `config.json` | Resolved parameters and effective temperature |
+| `partitions.json` | Client utterance ownership, visible/masked labels and held-out IDs |
+| `environment.json` | Python/platform/packages/devices, runtime engine and manifest hash |
+| `metrics.json` | Dataset, mode, elapsed time, round evaluation and client fit metrics |
+| `model.keras` | Final attention model; load after `import fedser.model` |
+
+`ua` is mean per-class recall; `accuracy` is ordinary utterance accuracy, both
+fractions in `[0,1]`. `eval_loss` is mean true-label negative log-probability.
+`accepted` and `unlabeled` count batch exposures; `num_examples`/`num-examples`
+is the distinct utterance count used by FedAvg. Flower also records evaluation
+at round 0. Output directories are created once. Training runs for the configured
+rounds, without automatic resume, early stopping or test-set model selection.
+
+## Native Flower CLI
+
+Run the README's `flwr run . --stream` command and match `num-supernodes` to the
+configured client count. Pass absolute `config` and `output` paths. The virtual
+environment's real path must not contain spaces; repository and data paths may.
+Files in `configs/` resolve paths against the checkout; other config files resolve
+paths against their own directory. CLI output overrides use the working directory.
+
+Use the same `FLWR_HOME` for `flwr list`, `flwr log RUN_ID --show` and
+`flwr stop RUN_ID`. Stopping a run leaves its local SuperLink available. When
+changing environments, stop only that environment's service; see the
+[Flower runtime guide](https://flower.ai/docs/framework/main/en/how-to-run-flower-locally.html).
+The README sets isolated ports and disables automatic runtime dependency installation.
+
+Check the completed run status and saved metrics/model files. `flwr build`
+packages the app; the Python `flower` command uses the same apps through Ray,
+and `train` executes the shared trainer sequentially. Deployment across machines
+requires client-local data, authenticated transport and an evaluation policy.

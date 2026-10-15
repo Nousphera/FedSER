@@ -1,4 +1,4 @@
-# Resolved on macOS arm64, Python 3.11; see docs/reproducibility.md.
+# Resolved on macOS arm64, Python 3.11; see docs/method.md.
 Mako==1.4.3
 Markdown==3.11.1
 MarkupSafe==3.0.4
