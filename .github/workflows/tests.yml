@@ -9,7 +9,7 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-      - run: python -m pip install -e '.[flower,test]' -c requirements-lock-py311.txt
+      - run: python -m pip install -r requirements.txt
       - run: python -m pip check
       - run: python -m pytest -q
       - run: fedser train --config configs/smoke.json --output runs/ci-smoke

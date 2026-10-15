@@ -17,7 +17,7 @@ Speech Emotion Recognition (SER) refers to the recognition of human emotions fro
 
 ## Requirements and installation
 
-Use Python 3.11 or 3.12. The dependency lock targets Python 3.11 on macOS arm64 CPU.
+Use Python 3.11 or 3.12 in a dedicated virtual environment.
 A CPU is sufficient for the smoke run. Put the environment at a path without
 spaces so Flower/Ray can start workers.
 
@@ -30,10 +30,10 @@ python -m pytest -q
 ```
 
 The setup script creates a new virtual environment and installs the package,
-Flower simulation and test dependencies using the tested dependency constraints.
+Flower simulation and test dependencies from `requirements.txt`.
 It refuses to change an existing environment. The equivalent manual install is
 `python3.11 -m venv "$HOME/.venvs/fedser"`, activate it, then
-`python -m pip install -e '.[flower,test]' -c requirements-lock-py311.txt`.
+`python -m pip install -r requirements.txt`.
 
 ## Data preparation
 
