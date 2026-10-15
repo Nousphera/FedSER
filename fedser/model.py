@@ -1,4 +1,4 @@
-"""Four-block STC model adapted from the author's recovered implementation.
+"""Four-block spectral, temporal and channel attention model.
 
 Channels-last execution supports CPU as well as GPU. Source mode preserves
 the original axis ordering mathematically, including softmax over time.

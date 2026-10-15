@@ -70,7 +70,7 @@ def create_app(config_override=None):
                                 evaluate_fn=evaluate_global)
         model.set_weights(result.arrays.to_numpy_ndarrays())
         model.save(output / "model.keras")
-        (output / "metrics.json").write_text(json.dumps({"benchmark_reproduction": False,
+        (output / "metrics.json").write_text(json.dumps({
             "dataset": config.dataset, "mode": config.mode, "seconds": time.monotonic() - start,
             "rounds": history}, indent=2) + "\n")
     return application

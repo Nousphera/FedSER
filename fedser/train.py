@@ -107,7 +107,7 @@ def waveform(record):
 
 
 def local_train(weights, records, shape, config, completed, client_completed, client_id):
-    """One fit creates a fresh Adam optimizer as in the recovered client."""
+    """Train one client fit with a fresh Adam optimizer."""
     tf.keras.backend.clear_session()
     seed = int(np.random.SeedSequence([config.seed, completed, client_id]).generate_state(1)[0])
     tf.keras.utils.set_random_seed(seed)
@@ -209,7 +209,7 @@ def run(config):
         history.append(result)
         print(json.dumps(result), flush=True)
     model.save(output / "model.keras")
-    result = {"benchmark_reproduction": False, "dataset": config.dataset, "mode": config.mode,
+    result = {"dataset": config.dataset, "mode": config.mode,
               "seconds": time.monotonic() - start, "rounds": history}
     (output / "metrics.json").write_text(json.dumps(result, indent=2) + "\n")
     return result

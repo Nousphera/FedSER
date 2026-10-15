@@ -20,11 +20,11 @@ def test_local_fit_changes_parameters_and_uses_exact_counts():
     assert any(not np.array_equal(a, b) for a, b in zip(weights, result))
 
 
-def test_end_to_end_training_writes_auditable_artifacts(tmp_path):
+def test_end_to_end_training_writes_experiment_artifacts(tmp_path):
     config = RunConfig(clients=2, rounds=2, participation=1., batch_size=4,
                        synthetic_per_client=8, labeled_fraction=.5, output=str(tmp_path / "run"))
     result = run(config)
-    assert result["benchmark_reproduction"] is False
+    assert result["dataset"] == "synthetic" and result["mode"] == config.mode
     assert len(result["rounds"]) == 2
     assert all(r["selected_clients"] == [0, 1] for r in result["rounds"])
     assert all(0 <= r["ua"] <= 1 for r in result["rounds"])

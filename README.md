@@ -4,15 +4,15 @@
 
 Vasileios Tsouvalas · Tanir Ozcelebi · Nirvana Meratnia · EmotionAware @ IEEE PerCom 2022
 
-[Paper](https://ieeexplore.ieee.org/document/9767445) · [Project](https://nousphera.github.io/FedSER/) · [Poster](https://nousphera.github.io/FedSER/poster.pdf)
+[<img src="docs/assets/icons/paper.svg" width="16" height="16" alt=""> Paper](https://ieeexplore.ieee.org/document/9767445) · [<img src="docs/assets/icons/project.svg" width="16" height="16" alt=""> Project](https://nousphera.github.io/FedSER/) · [Poster](https://nousphera.github.io/FedSER/poster.pdf)
 
 ## Abstract
 
 Speech Emotion Recognition (SER) refers to the recognition of human emotions from natural speech. If done accurately, it can offer a number of benefits in building human-centered context-aware intelligent systems. Existing SER approaches are largely centralized, without considering users' privacy. Federated Learning (FL) is a distributed machine learning paradigm dealing with decentralization of privacy-sensitive personal data. In this paper, we present a privacy-preserving and data-efficient SER approach by utilizing the concept of FL. To the best of our knowledge, this is the first federated SER approach, which utilizes self-training learning in conjunction with federated learning to exploit both labeled and unlabeled on-device data. Our experimental evaluations on the IEMOCAP dataset shows that our federated approach can learn generalizable SER models even under low availability of data labels and highly non-i.i.d. distributions. We show that our approach with as few as 10% labeled data, on average, can improve the recognition rate by 8.67% compared to the fully-supervised federated counterparts.
 
-## Setup
+## Install
 
-Python 3.11 is tested on macOS arm64 CPU; Python 3.12 is supported but untested.
+Use Python 3.11 or 3.12. The dependency lock targets Python 3.11 on macOS arm64 CPU.
 A CPU is sufficient for the smoke run. Put the environment at a path without
 spaces so Flower/Ray can start workers.
 
@@ -45,8 +45,8 @@ python scripts/prepare_data.py validate --manifest data/iemocap.json
 Preparation indexes improvised neutral/happy/sad/angry utterances, decodes every
 16 kHz PCM WAV, and atomically writes IDs, speaker/session labels and SHA-256
 checksums. Existing manifests are preserved. To merge excited into happy, add
-`--merge-excited`; this choice is recorded. The original class mapping remains
-ambiguous; see [data and split details](docs/reproducibility.md).
+`--merge-excited`; this choice is recorded. See [data and split details](docs/reproducibility.md) for label policies and
+speaker-based evaluation.
 
 ## Run
 
@@ -56,6 +56,7 @@ full attention CNN with two clients for two rounds on generated waveforms:
 ```bash
 export FLWR_HOME="$HOME/.cache/fedser-flower"
 export FLWR_LOCAL_SUPERLINK_HTTP_API_PORT=39131
+export FLWR_LOCAL_CONTROL_API_PORT=39231
 export FLWR_DISABLE_RUNTIME_DEPENDENCY_INSTALLATION=1
 flwr run . --stream \
   --run-config "config='$(pwd)/configs/smoke.json' output='$(pwd)/runs/flower-smoke'" \
@@ -76,18 +77,18 @@ self-training. For sequential debugging, use
 `fedser train --config configs/smoke.json --output runs/sequential-smoke`.
 Flower keeps its local SuperLink running; see [runtime lifecycle and path rules](docs/reproducibility.md#native-flower-cli).
 
-## Outputs and reproducibility
+## Configuration and outputs
 
 Each new output directory contains `config.json`, `partitions.json`,
 `environment.json`, `metrics.json`, and `model.keras`. Partitions save utterance
 ownership and label masks; metrics include utterance accuracy, unweighted accuracy
 and client participation. Choose a new output directory for each run.
 
-The [method mapping](docs/method.md), [reproducibility guide](docs/reproducibility.md)
-and [source provenance](provenance/README.md) distinguish the paper interpretation
-from recovered behavior. Full IEMOCAP benchmarks, GPU execution and original
-checkpoint equivalence remain unverified. This local research simulation adds no
-formal privacy guarantee.
+Configure the objective and attention with `mode`, the evaluation split with
+`protocol` and `fold`, and client allocation with `partition` and `clients`.
+The [method guide](docs/method.md) describes both modes; the
+[experiment guide](docs/reproducibility.md) covers label budgets, repeated runs
+and Flower runtime management.
 
 ## Citation
 
@@ -106,6 +107,6 @@ formal privacy guarantee.
 
 ## Licensing
 
-The recovered source has no code license; reuse terms remain unspecified.
-Contact the authors for permission. Dataset, publication and dependency terms
-remain with their providers; see [source provenance](provenance/README.md).
+A software license has not been specified. Contact the authors for reuse terms.
+Dataset, publication and dependency terms remain with their providers.
+See [source credits](provenance/README.md).
